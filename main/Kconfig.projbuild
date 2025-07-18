@@ -1,4 +1,4 @@
-menu "ARGUS Configuration"
+menu "THEMIS Configuration"
 
     config I2C_MASTER_SCL
         int "SCL GPIO Num"
