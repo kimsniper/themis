@@ -48,23 +48,23 @@ using namespace std::chrono_literals;
 
 static const char* TAG = "main";
 static Servo servo;
-static std::atomic<float> pitch{0.0f};
+static std::atomic<float> roll{0.0f};
 
 static MPU6050::Device Dev = {
     .i2cPort = 0,
     .i2cAddress = MPU6050::I2C_ADDRESS_MPU6050_AD0_L
 };
 
-float computeAccelPitch(float ax, float ay, float az) {
-    return atan2f(ax, sqrtf(ay * ay + az * az)) * 180.0f / M_PI;
+float computeAccelRoll(float ax, float ay, float az) {
+    return atan2f(ay, sqrtf(ax * ax + az * az)) * 180.0f / M_PI;
 }
 
-float integrateGyroPitch(float prevPitch, float gyroX_deg_per_sec, float dt) {
-    return prevPitch + gyroX_deg_per_sec * dt;
+float integrateGyroRoll(float prevRoll, float gyroY_deg_per_sec, float dt) {
+    return prevRoll + gyroY_deg_per_sec * dt;
 }
 
-bool calibrateSensors(MPU6050::MPU6050_Driver& mpu, float& gyroBiasX, int samples = 500) {
-    float sumGyroX = 0;
+bool calibrateSensors(MPU6050::MPU6050_Driver& mpu, float& gyroBiasY, int samples = 500) {
+    float sumGyroY = 0;
     int successCount = 0;
 
     std::cout << "Calibrating IMU" << std::endl;
@@ -72,7 +72,7 @@ bool calibrateSensors(MPU6050::MPU6050_Driver& mpu, float& gyroBiasX, int sample
     for (int i = 0; i < samples; i++) {
         MPU6050::Mpu6050_GyroData_t gyroData;
         if (mpu.Mpu6050_GetGyroData(gyroData) == Mpu6050_Error_t::MPU6050_OK) {
-            sumGyroX += gyroData.Gyro_X;
+            sumGyroY += gyroData.Gyro_Y;
             successCount++;
         }
         std::this_thread::sleep_for(10ms);
@@ -83,8 +83,8 @@ bool calibrateSensors(MPU6050::MPU6050_Driver& mpu, float& gyroBiasX, int sample
         return false;
     }
 
-    gyroBiasX = sumGyroX / successCount;
-    std::cout << "Calibration complete. Gyro bias X: " << gyroBiasX << " °/s" << std::endl;
+    gyroBiasY = sumGyroY / successCount;
+    std::cout << "Calibration complete. Gyro bias Y: " << gyroBiasY << " °/s" << std::endl;
     return true;
 }
 
@@ -111,8 +111,8 @@ void imu_sensor_thread() {
     std::cout << "MPU6050 initialized successfully. Device ID: 0x"
               << std::hex << static_cast<int>(dev_id) << std::dec << std::endl;
 
-    float gyroBiasX = 0.0f;
-    if (!calibrateSensors(mpu, gyroBiasX)) {
+    float gyroBiasY = 0.0f;
+    if (!calibrateSensors(mpu, gyroBiasY)) {
         std::cerr << "Failed calibration, using zero bias" << std::endl;
     }
 
@@ -154,12 +154,12 @@ void imu_sensor_thread() {
         float dt = std::chrono::duration<float>(now - prevTime).count();
         prevTime = now;
 
-        float gyroX_corrected = gyroData.Gyro_X - gyroBiasX;
-        float accPitch = computeAccelPitch(accelData.Accel_X, accelData.Accel_Y, accelData.Accel_Z);
-        float gyroPitch = integrateGyroPitch(pitch, gyroX_corrected, dt);
-        pitch = alpha * gyroPitch + (1.0f - alpha) * accPitch;
+        float gyroY_corrected = gyroData.Gyro_Y - gyroBiasY;
+        float accRoll = computeAccelRoll(accelData.Accel_X, accelData.Accel_Y, accelData.Accel_Z);
+        float gyroRoll = integrateGyroRoll(roll, gyroY_corrected, dt);
+        roll = alpha * gyroRoll + (1.0f - alpha) * accRoll;
 
-        float error = 0.0f - pitch;
+        float error = 0.0f - roll;
         integral += error * dt;
         integral = std::clamp(integral, -integralLimit, integralLimit);
         float derivative = (error - prevError) / dt;
@@ -172,8 +172,11 @@ void imu_sensor_thread() {
         static int printCounter = 0;
         if (++printCounter >= 10) {
             printCounter = 0;
-            std::cout << "Pitch: " << pitch << "°, "
+            std::cout << "Accelerometer Roll: " << accRoll << "°, "
+                      << "Gyro Roll: " << gyroRoll << "°, "
+                      << "Roll: " << roll << "°, "
                       << "Servo: " << static_cast<int>(servoAngle) << "°" << std::endl;
+            // std::cout << roll << "," << servoAngle << std::endl;
         }
 
         auto processingTime = std::chrono::steady_clock::now() - now;
