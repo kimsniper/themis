@@ -49,6 +49,10 @@ using namespace std::chrono_literals;
 static const char* TAG = "main";
 static Servo servo;
 static std::atomic<float> roll{0.0f};
+static std::atomic<float> Kp{3.0f};
+static std::atomic<float> Ki{0.05f};
+static std::atomic<float> Kd{0.5f};
+static std::atomic<float> alpha{0.98f};
 
 static MPU6050::Device Dev = {
     .i2cPort = 0,
@@ -88,6 +92,60 @@ bool calibrateSensors(MPU6050::MPU6050_Driver& mpu, float& gyroBiasY, int sample
     return true;
 }
 
+void sendGains() {
+    std::cout << "Gains," 
+              << Kp.load() << "," 
+              << Ki.load() << "," 
+              << Kd.load() << "," 
+              << alpha.load() << std::endl;
+}
+
+void gain_tuning_thread() {
+    char buffer[64];
+
+    std::this_thread::sleep_for(1000ms);
+    sendGains();
+
+    while (true) {
+        if (fgets(buffer, sizeof(buffer), stdin) != nullptr) {
+            char type;
+            float value;
+            if (sscanf(buffer, " %c %f", &type, &value) == 2) {
+                switch (type) {
+                    case 'p':
+                    case 'P':
+                        Kp = value;
+                        std::cerr << "[Gain Update] Kp = " << Kp << std::endl;
+                        break;
+                    case 'i':
+                    case 'I':
+                        Ki = value;
+                        std::cerr << "[Gain Update] Ki = " << Ki << std::endl;
+                        break;
+                    case 'd':
+                    case 'D':
+                        Kd = value;
+                        std::cerr << "[Gain Update] Kd = " << Kd << std::endl;
+                        break;
+                    case 'a':
+                    case 'A':
+                        alpha = value;
+                        std::cerr << "[Complimentary Filter Update] Alpha = " << alpha << std::endl;
+                        break;
+                    default:
+                        // std::cerr << "[Gain Update] Unknown type: " << type << std::endl;
+                        break;
+                }
+            } else {
+                std::cerr << "[Gain Update] Invalid input format: " << buffer;
+            }
+        }
+
+        std::this_thread::sleep_for(10ms);
+    }
+}
+
+
 void imu_sensor_thread() {
 
     if (mpu6050_hal_init(Dev.i2cPort) == Mpu6050_Error_t::MPU6050_ERR) {
@@ -123,10 +181,10 @@ void imu_sensor_thread() {
 
     std::this_thread::sleep_for(500ms);
 
-    float alpha = 0.98f;
-    float Kp = 3.0f;
-    float Ki = 0.05f;
-    float Kd = 0.5f;
+    // float alpha = 0.98f;
+    // float Kp = 3.0f;
+    // float Ki = 0.05f;
+    // float Kd = 0.5f;
     float integral = 0.0f;
     float prevError = 0.0f;
     const float integralLimit = 25.0f;
@@ -172,11 +230,15 @@ void imu_sensor_thread() {
         static int printCounter = 0;
         if (++printCounter >= 10) {
             printCounter = 0;
-            std::cout << "Accelerometer Roll: " << accRoll << "°, "
-                      << "Gyro Roll: " << gyroRoll << "°, "
-                      << "Roll: " << roll << "°, "
-                      << "Servo: " << static_cast<int>(servoAngle) << "°" << std::endl;
+            // std::cout << "Accelerometer Roll: " << accRoll << "°, "
+            //           << "Gyro Roll: " << gyroRoll << "°, "
+            //           << "Roll: " << roll << "°, "
+            //           << "Servo: " << static_cast<int>(servoAngle) << "°" << std::endl;
             // std::cout << roll << "," << servoAngle << std::endl;
+            std::cout << roll << "," << accRoll << "," << gyroRoll << "," << servoAngle << std::endl;
+
+            // std::cout << "Kp: " << Kp << ", Ki: " << Ki << ", Kd: " << Kd << ", Control: " << control << std::endl;
+            std::cout << "Kp: " << Kp << ", Ki: " << Ki << ", Kd: " << Kd << ", Alpha: " << alpha << ", Control: " << control << std::endl;
         }
 
         auto processingTime = std::chrono::steady_clock::now() - now;
@@ -197,4 +259,13 @@ extern "C" void app_main(void) {
 
     std::thread imu_thread(imu_sensor_thread);
     imu_thread.detach();
+
+    esp_pthread_cfg_t cfg_gain = esp_pthread_get_default_config();
+    cfg_gain.stack_size = 4096;
+    cfg_gain.prio = 5;
+    cfg_gain.pin_to_core = 1;
+    cfg_gain.thread_name = "gain_thread";
+    ESP_ERROR_CHECK(esp_pthread_set_cfg(&cfg_gain));
+    std::thread gain_thread(gain_tuning_thread);
+    gain_thread.detach();
 }
