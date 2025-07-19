@@ -1,5 +1,4 @@
 import serial
-import threading
 import queue
 import tkinter as tk
 from tkinter import ttk
@@ -27,6 +26,8 @@ class PIDVisualizer:
     def __init__(self, root):
         self.root = root
         root.title("THEMIS: Real-Time Roll Stabilization")
+
+        self.slider_labels = {}
 
         # Main frames
         self.control_frame = tk.Frame(root)
@@ -60,12 +61,14 @@ class PIDVisualizer:
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         self.ani = animation.FuncAnimation(self.fig, self.update_plot, interval=100)
 
+        # Request gain values from MCU after startup
+        self.root.after(2000, self.query_mcu_gains)
+
     def add_slider(self, label, frm, to, var, command):
         frame = tk.Frame(self.control_frame)
         frame.pack(pady=(10, 0), anchor="w")
 
         ttk.Label(frame, text=label).pack(side=tk.LEFT)
-
         slider = ttk.Scale(frame, from_=frm, to=to, orient=tk.HORIZONTAL, length=150, variable=var)
         slider.pack(side=tk.LEFT)
 
@@ -80,6 +83,8 @@ class PIDVisualizer:
 
         slider.config(command=on_slide)
         slider.bind("<ButtonRelease-1>", on_release)
+
+        self.slider_labels[label] = val_label  # fix: use string key
 
     def add_alpha_slider(self, label, frm, to, var, command):
         frame = tk.Frame(self.control_frame)
@@ -112,6 +117,19 @@ class PIDVisualizer:
     def set_kd(self, val): out_queue.put(f"d {val:.2f}\n")
     def set_alpha(self, val): out_queue.put(f"a {val:.3f}\n")
 
+    def query_mcu_gains(self):
+        out_queue.put("get\n")
+
+    def update_slider_label(self, label_name):
+        label = self.slider_labels.get(label_name)
+        if label:
+            if label_name == "Kp":
+                label.config(text=f"{self.kp_var.get():.2f}")
+            elif label_name == "Ki":
+                label.config(text=f"{self.ki_var.get():.2f}")
+            elif label_name == "Kd":
+                label.config(text=f"{self.kd_var.get():.2f}")
+
     def log_terminal(self, message):
         self.terminal.config(state=tk.NORMAL)
         self.terminal.insert(tk.END, message + '\n')
@@ -131,6 +149,27 @@ class PIDVisualizer:
                     return
 
                 self.log_terminal(line)
+
+                # Gain update from MCU
+                if line.startswith("Gains"):
+                    try:
+                        _, kp, ki, kd, alpha = line.split(',')
+                        self.kp_var.set(float(kp))
+                        self.ki_var.set(float(ki))
+                        self.kd_var.set(float(kd))
+                        self.alpha_var.set(float(alpha))
+
+                        # update slider labels as well
+                        self.update_slider_label("Kp")
+                        self.update_slider_label("Ki")
+                        self.update_slider_label("Kd")
+
+                        self.alpha_gyro_label.config(text=f"Gyro (α): {float(alpha):.3f}")
+                        self.alpha_accel_label.config(text=f"Accel (1−α): {1 - float(alpha):.3f}")
+                        self.log_terminal(f"Synced gains: Kp={kp}, Ki={ki}, Kd={kd}, α={alpha}")
+                    except Exception as e:
+                        self.log_terminal(f"Gain parse error: {e}")
+                    return
 
                 parts = line.split(',')
                 if len(parts) == 4:
@@ -185,11 +224,11 @@ class PIDVisualizer:
 
                     self.canvas.draw()
             except Exception as e:
-                self.log_terminal(f"⚠️ Parse error: {e}")
+                self.log_terminal(f"Parse error: {e}")
 
 # Run
 if __name__ == "__main__":
-    print(f"✅ Connected to {PORT} at {BAUD} baud")
+    print(f"Connected to {PORT} at {BAUD} baud")
     root = tk.Tk()
     app = PIDVisualizer(root)
     root.mainloop()
