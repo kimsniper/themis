@@ -65,9 +65,6 @@ Mpu6050_Error_t MPU6050_Driver::Mpu6050_Init(const Config* config) {
     Mpu6050_GyroFsSel(config->fsSel);
     mpu6050_i2c_hal_ms_delay(50);
 
-    printf("u8FsSelCurrentVal: %d", u8FsSelCurrentVal);
-    printf("u8FsSelCurrentVal: %d", u8AfsSelCurrentVal);
-
     return err;
 }
 
