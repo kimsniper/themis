@@ -225,7 +225,7 @@ class PIDVisualizer:
                         self.ax_roll.text(x, gyro_roll_data[-1] - 4, f"{gyro_roll_data[-1]:.1f}°", color='red', fontsize=10)
 
                     self.ax_roll.axhline(y=0, color='gray', linestyle='--', label='Setpoint (0°)')
-                    self.ax_roll.set_ylim(-60, 60)
+                    self.ax_roll.set_ylim(-90, 90)
                     self.ax_roll.set_ylabel("Roll (°)")
                     self.ax_roll.set_title("Roll Angle vs Time")
                     self.ax_roll.legend()
@@ -237,7 +237,7 @@ class PIDVisualizer:
                     if x_servo >= 0:
                         self.ax_servo.text(x_servo, servo_data[-1] + 5, f"{servo_data[-1]:.1f}°", color='orange', fontsize=10)
 
-                    self.ax_servo.set_ylim(0, 180)
+                    self.ax_servo.set_ylim(-5, 185)
                     self.ax_servo.set_ylabel("Servo (°)")
                     self.ax_servo.set_xlabel("Time (frames)")
                     self.ax_servo.set_title("Servo Output vs Time")
