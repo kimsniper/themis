@@ -220,6 +220,7 @@ void imu_sensor_thread() {
     int errorCount = 0;
     const int maxErrorCount = 10;
     float servoAngle = 90.0;
+    int servoAnglePrev = 0;
 
     while (true) {
         MPU6050::Mpu6050_AccelData_t accelData;
@@ -270,7 +271,12 @@ void imu_sensor_thread() {
             manual_smoothed_angle = current;
             servoAngle = current;
         }
-        servo.setAngle(static_cast<int>(servoAngle));
+
+        if(static_cast<int>(servoAngle) != servoAnglePrev)
+        {
+            servoAnglePrev = static_cast<int>(servoAngle);
+            servo.setAngle(static_cast<int>(servoAngle));
+        }
 
         static int printCounter = 0;
         if (++printCounter >= 10) {
