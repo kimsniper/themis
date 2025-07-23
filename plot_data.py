@@ -84,8 +84,27 @@ class PIDVisualizer:
         frame.pack(pady=(10, 0), anchor="w")
 
         ttk.Label(frame, text=label).pack(side=tk.LEFT)
-        slider = ttk.Scale(frame, from_=frm, to=to, orient=tk.HORIZONTAL, length=150, variable=var)
+
+        def decrement():
+            value = var.get() - (0.01 if to <= 1 else 0.1)
+            var.set(max(frm, round(value, 3)))
+            val_label.config(text=f"{var.get():.2f}")
+            command(var.get())
+
+        btn_dec = ttk.Button(frame, text="−", width=2, command=decrement)
+        btn_dec.pack(side=tk.LEFT)
+
+        slider = ttk.Scale(frame, from_=frm, to=to, orient=tk.HORIZONTAL, length=120, variable=var)
         slider.pack(side=tk.LEFT)
+
+        def increment():
+            value = var.get() + (0.01 if to <= 1 else 0.1)
+            var.set(min(to, round(value, 3)))
+            val_label.config(text=f"{var.get():.2f}")
+            command(var.get())
+
+        btn_inc = ttk.Button(frame, text="+", width=2, command=increment)
+        btn_inc.pack(side=tk.LEFT)
 
         val_label = ttk.Label(frame, text=f"{var.get():.2f}", width=5)
         val_label.pack(side=tk.LEFT)
@@ -107,8 +126,29 @@ class PIDVisualizer:
 
         ttk.Label(frame, text=label).pack(anchor="w")
 
-        slider = ttk.Scale(frame, from_=frm, to=to, orient=tk.HORIZONTAL, length=150, variable=var)
-        slider.pack()
+        control_frame = tk.Frame(frame)
+        control_frame.pack(anchor="w")
+
+        def decrement():
+            value = var.get() - 0.01
+            var.set(max(frm, round(value, 3)))
+            on_slide(var.get())
+            command(var.get())
+
+        btn_dec = ttk.Button(control_frame, text="−", width=2, command=decrement)
+        btn_dec.pack(side=tk.LEFT)
+
+        slider = ttk.Scale(control_frame, from_=frm, to=to, orient=tk.HORIZONTAL, length=120, variable=var)
+        slider.pack(side=tk.LEFT)
+
+        def increment():
+            value = var.get() + 0.01
+            var.set(min(to, round(value, 3)))
+            on_slide(var.get())
+            command(var.get())
+
+        btn_inc = ttk.Button(control_frame, text="+", width=2, command=increment)
+        btn_inc.pack(side=tk.LEFT)
 
         self.alpha_gyro_label = ttk.Label(frame, text=f"Gyro (α): {var.get():.3f}")
         self.alpha_gyro_label.pack(anchor="w")
@@ -138,7 +178,6 @@ class PIDVisualizer:
     def manual_servo_changed(self, val):
         angle = float(val)
         self.manual_servo_label.config(text=f"Manual Servo Angle: {angle:.0f}°")
-        # Do not send serial command here
 
     def manual_servo_released(self, event):
         if not self.pid_enabled.get():
