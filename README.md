@@ -96,7 +96,7 @@ idf.py --version  # Project is based on v5.4.2
 
 ---
 
-# Data Visualization UI (`plot_data.py`)
+## Data Visualization UI (`plot_data.py`)
 
 A real-time Python-based UI is provided to:
 
@@ -117,3 +117,9 @@ pip install matplotlib pyserial
 ```bash
 python3 plot_data.py
 ```
+
+---
+
+## Video Demo
+
+Link: https://www.linkedin.com/posts/activity-7353984546817658881-uNuJ?utm_source=share&utm_medium=member_android&rcm=ACoAACmY-xYBsymlj36REm4IhJ-hJ5gTkK0J9l0
